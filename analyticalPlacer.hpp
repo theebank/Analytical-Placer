@@ -79,5 +79,6 @@ public:
     int computecost(pair<int, int> tailbin, pair<int, int> bk, int psi);
     void splitIntoBins();
     vector<pair<pair<int, int>, int>> findOverfilledBins();
+    vector<pair<int, int>> directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
 };
 #endif // ANALYTICALPLACER_HPP
