@@ -10,6 +10,7 @@
 #include <map>
 #include <limits>
 #include <algorithm>
+#include <queue>
 #include "umfpack.h"
 
 #ifndef ANALYTICALPLACER_HPP
@@ -67,7 +68,16 @@ public:
     void adjustFixedWeights(double factor);
     void analyticalPlacementv2(string path, double factor);
 
+    map<pair<int, int>, int> bins;                // key = coordinate, value = supply
+    vector<pair<pair<int, int>, int>> overflowed; // key = bin_num, value = supply
+    map<vector<pair<int, int>>, int> cost;
     void daravspreading();
-    void identifyCandidatePaths();
+    vector<vector<pair<int, int>>> identifyCandidatePaths(pair<int, int> bi, int psi);
+    int supply(pair<int, int> bi);
+    int usage(pair<int, int> bi);
+    int capacity(pair<int, int> bi);
+    int computecost(pair<int, int> tailbin, pair<int, int> bk, int psi);
+    void splitIntoBins();
+    vector<pair<pair<int, int>, int>> findOverfilledBins();
 };
 #endif // ANALYTICALPLACER_HPP
