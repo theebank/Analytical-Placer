@@ -164,7 +164,7 @@ matrix_UMF analyticalPlacer::createMatrix()
                 - int Ai[nz];
                 - double Ax[nz];
             - All nonzeros are entries, but an entry may be numerically zero. The row indices of entries in column j are stored in Ai[Ap[j] ... Ap[j+1]-1]. corresponding numerical values are stored in Ax[Ap[j] ... Ax[j+1]-1].
-            - No duplicate rππow indices may be present and the row indices in any given column must be sorted in ascending order.
+            - No duplicate r??ow indices may be present and the row indices in any given column must be sorted in ascending order.
             - First entry Ap[0] must be zero
             - Total number of entries in matrix is thus nz=Ap[n]
             - Except for the fact that extra zero entries may be included there is a unique compressed column representation of any given matrix A
@@ -377,18 +377,18 @@ void analyticalPlacer::daravspreading()
     {
         overflowed = findOverfilledBins();
         cout << overflowed.size() << endl;
-        if (overflowed.size() == 2)
+        if (overflowed.size() == 5)
         {
             for (auto i : overflowed)
             {
                 cout << i.first.first << "," << i.first.second << endl;
                 for (auto j : bins[i.first])
                 {
-                    cout << j << ",";
+                    cout << j << ",(" << blockCoordinates_new[j].first << "," << blockCoordinates_new[j].second << ")" << endl;
                 }
                 cout << endl;
             }
-            return;
+            blockCoordinates = blockCoordinates_new;
         }
         psi = iter * iter;
         if (overflowed.size() == 0)
@@ -405,10 +405,11 @@ void analyticalPlacer::daravspreading()
             vector<vector<pair<int, int>>> Pbi = identifyCandidatePaths(bi.first, psi);
             for (vector<pair<int, int>> pk : Pbi)
             {
-                if (supply(bi.first) > 0)
-                {
-                    cellMove(pk, psi);
-                }
+                // if (supply(bi.first) > 0)
+                // {
+                cellMove(pk, psi);
+                // splitIntoBins();
+                // }
             }
         }
         iter++;
@@ -445,7 +446,7 @@ vector<vector<pair<int, int>>> analyticalPlacer::identifyCandidatePaths(pair<int
             pair<int, int> bk = tailbin;
             bk.first += nDirection.first;
             bk.second += nDirection.second;
-            if ((0 <= bk.first && bk.first < 28) && (0 <= bk.second && bk.second <= 29))
+            if ((0 <= bk.first && bk.first < 30) && (0 <= bk.second && bk.second < 30))
             {
                 if (visited[bk])
                 {
@@ -508,42 +509,74 @@ void analyticalPlacer::cellMove(vector<pair<int, int>> P, int psi)
         }
         sort(blockDistances.begin(), blockDistances.end(), [](const pair<int, double> &a, const pair<int, double> &b)
              { return a.second < b.second; });
-
-        for (auto block : blockDistances)
+        if (blockDistances.size() == 0)
         {
-            if (bins[Vsink].size() == 0)
-            {
-                int xbin = static_cast<int>(blockCoordinates_new[block.first].first);
-                int ybin = static_cast<int>(blockCoordinates_new[block.first].second);
-                bins[{xbin, ybin}].erase(block.first);
-                bins[{xbin, ybin + 1}].erase(block.first);
-                bins[{xbin + 1, ybin}].erase(block.first);
-                bins[{xbin + 1, ybin + 1}].erase(block.first);
-                if (blocktypes[block.first] == 1)
-                {
-                    bins[{xbin + 2, ybin}].erase(block.first);
-                    bins[{xbin + 2, ybin + 1}].erase(block.first);
-                }
-
-                blockCoordinates_new[block.first] = {blockCoordinates_new[block.first].first - Vsrc.first + Vsink.first, blockCoordinates_new[block.first].second - Vsrc.second + Vsink.second};
-
-                xbin = static_cast<int>(blockCoordinates_new[block.first].first);
-                ybin = static_cast<int>(blockCoordinates_new[block.first].second);
-                bins[{xbin, ybin}].insert(block.first);
-                bins[{xbin, ybin + 1}].insert(block.first);
-                bins[{xbin + 1, ybin}].insert(block.first);
-                bins[{xbin + 1, ybin + 1}].insert(block.first);
-                if (blocktypes[block.first] == 1)
-                {
-                    bins[{xbin + 2, ybin}].insert(block.first);
-                    bins[{xbin + 2, ybin + 1}].insert(block.first);
-                }
-                blockCoordinates = blockCoordinates_new;
-            }
-            Vsink = Vsrc;
             break;
         }
-        // cout << S.size() << endl;
+        vector<pair<int, int>> result;
+        for (auto point : P)
+        {
+            result.push_back(point);
+            if (point == Vsink)
+                break;
+        }
+        auto block = blockDistances[0];
+
+        if (cost[result] <= psi)
+        {
+            pair<double, double> coords = blockCoordinates_new[block.first];
+            int xbin = round(coords.first);
+            int ybin = round(coords.second);
+            bins[{xbin, ybin}].erase(block.first);
+            if (ybin > 0)
+            {
+                bins[{xbin, ybin - 1}].erase(block.first);
+            }
+            if (xbin > 0)
+            {
+                bins[{xbin - 1, ybin}].erase(block.first);
+                if (ybin > 0)
+                {
+                    bins[{xbin - 1, ybin - 1}].erase(block.first);
+                }
+            }
+            if (blocktypes[block.first] == 1)
+            {
+                bins[{xbin + 1, ybin}].erase(block.first);
+                if (ybin > 0)
+                {
+                    bins[{xbin + 1, ybin - 1}].erase(block.first);
+                }
+            }
+
+            blockCoordinates_new[block.first] = {blockCoordinates_new[block.first].first - Vsrc.first + Vsink.first, blockCoordinates_new[block.first].second - Vsrc.second + Vsink.second};
+
+            xbin = round(blockCoordinates_new[block.first].first);
+            ybin = round(blockCoordinates_new[block.first].second);
+            bins[{xbin, ybin}].insert(block.first);
+            if (ybin > 0)
+            {
+                bins[{xbin, ybin - 1}].insert(block.first);
+            }
+            if (xbin > 0)
+            {
+                bins[{xbin - 1, ybin}].insert(block.first);
+                if (ybin > 0)
+                {
+                    bins[{xbin - 1, ybin - 1}].insert(block.first);
+                }
+            }
+            if (blocktypes[block.first] == 1)
+            {
+                bins[{xbin + 1, ybin}].insert(block.first);
+                if (ybin > 0)
+                {
+                    bins[{xbin + 1, ybin - 1}].insert(block.first);
+                }
+            }
+            blockCoordinates = blockCoordinates_new;
+            Vsink = Vsrc;
+        }
     }
 }
 int analyticalPlacer::supply(pair<int, int> bi)
@@ -585,16 +618,28 @@ void analyticalPlacer::splitIntoBins()
     for (auto blockID : nonfixedblockids)
     {
         pair<double, double> coords = blockCoordinates_new[blockID];
-        int xbin = static_cast<int>(coords.first);
-        int ybin = static_cast<int>(coords.second);
+        int xbin = round(coords.first);
+        int ybin = round(coords.second);
         bins[{xbin, ybin}].insert(blockID);
-        bins[{xbin, ybin + 1}].insert(blockID);
-        bins[{xbin + 1, ybin}].insert(blockID);
-        bins[{xbin + 1, ybin + 1}].insert(blockID);
+        if (ybin > 0)
+        {
+            bins[{xbin, ybin - 1}].insert(blockID);
+        }
+        if (xbin > 0)
+        {
+            bins[{xbin - 1, ybin}].insert(blockID);
+            if (ybin > 0)
+            {
+                bins[{xbin - 1, ybin - 1}].insert(blockID);
+            }
+        }
         if (blocktypes[blockID] == 1)
         {
-            bins[{xbin + 2, ybin}].insert(blockID);
-            bins[{xbin + 2, ybin + 1}].insert(blockID);
+            bins[{xbin + 1, ybin}].insert(blockID);
+            if (ybin > 0)
+            {
+                bins[{xbin + 1, ybin - 1}].insert(blockID);
+            }
         }
     }
 }
@@ -605,7 +650,7 @@ vector<pair<pair<int, int>, int>> analyticalPlacer::findOverfilledBins()
     ret.clear();
     for (auto bin : bins)
     {
-        if (bin.second.size() > 1)
+        if (supply(bin.first) > 0)
         {
             ret.push_back({bin.first, bin.second.size()});
         }

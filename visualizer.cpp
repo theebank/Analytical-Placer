@@ -113,13 +113,13 @@ analyticalPlacer ap;
 
 /*int main(int argc, char **argv)
 {
-    if (argc != 4)
+    if (argc != 3)
     {
-        std::cerr << "usage: " << argv[0] << " <0 for part1/2 1 for part 3> <test circuit Num> <weight factor between fixed node and movables>\n";
+        std::cerr << "usage: " << argv[0] << " <test circuit Num> <weight factor between fixed node and movables>\n";
         return 1;
     }
 
-    double weightfactor = std::atof(argv[3]);
+    double weightfactor = std::atof(argv[2]);
     ezgl::application::settings settings;
 
     // Path to the "main.ui" file that contains an XML description of the UI.
@@ -141,21 +141,9 @@ analyticalPlacer ap;
     // coordinate system we want to draw in.
     application.add_canvas("MainCanvas", draw_main_canvas, initial_world);
 
-    string filenum = argv[2];
-    int part = std::atoi(argv[1]);
-    if (part == 0)
-    {
-        ap.analyticalPlacementv2("./tests/cct" + filenum + ".txt", weightfactor);
-    }
-    else if (part == 1)
-    {
-        // Darav spreading....
-    }
-    else
-    {
-        std::cerr << "usage: " << argv[0] << " <0 for part1/2 1 for part 3> <test circuit Num> <weight factor between fixed node and movables>\n";
-        return 1;
-    }
+    string filenum = argv[1];
+    ap.analyticalPlacementv2("./tests/cct" + filenum + ".txt", weightfactor);
+    ap.daravspreading();
 
     // Run the application until the user quits.
     // This hands over all control to the GTK runtime---after this point
