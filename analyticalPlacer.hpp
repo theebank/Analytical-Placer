@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <queue>
 #include <cmath>
+#include <stack>
 #include "umfpack.h"
 
 #ifndef ANALYTICALPLACER_HPP
@@ -69,20 +70,23 @@ public:
     void adjustFixedWeights(double factor);
     void analyticalPlacementv2(string path, double factor);
 
-    map<int, pair<double, double>> blockCoordinates_orig;
-    map<int, pair<double, double>> blockCoordinates_new;
-    map<pair<int, int>, int>
-        bins;                                     // key = coordinate, value = supply
-    vector<pair<pair<int, int>, int>> overflowed; // key = bin_num, value = supply
-    map<vector<pair<int, int>>, int> cost;
     void daravspreading();
     vector<vector<pair<int, int>>> identifyCandidatePaths(pair<int, int> bi, int psi);
+    void cellMove(vector<pair<int, int>> P, int psi);
     int supply(pair<int, int> bi);
     int usage(pair<int, int> bi);
     int capacity(pair<int, int> bi);
-    int computecost(pair<int, int> tailbin, pair<int, int> bk, int psi);
+    double computecost(pair<int, int> tailbin, pair<int, int> bk, int psi);
     void splitIntoBins();
     vector<pair<pair<int, int>, int>> findOverfilledBins();
-    vector<pair<int, int>> directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+    map<pair<int, int>, set<int>> bins; // key = coordinate, value = blocks inside
+
+    map<int, pair<double, double>> blockCoordinates_orig;
+    map<int, pair<double, double>> blockCoordinates_new;
+    vector<pair<pair<int, int>, int>> overflowed; // key = bin_num, value = supply
+    // map<pair<int, int>, int>
+    //     bins;                                     // key = coordinate, value = supply
+    map<vector<pair<int, int>>, int> cost;
+    vector<pair<int, int>> directions = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 };
 #endif // ANALYTICALPLACER_HPP

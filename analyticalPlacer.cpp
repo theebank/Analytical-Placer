@@ -16,9 +16,6 @@ int main(int argc, char **argv)
     // ap.analyticalPlacement("./tests/cct2.txt");
     cout << "---------------------------------------------------------------------" << endl;
     ap.daravspreading();
-    int n = ap.nonfixedblockids.size();
-    double xid_x[n];
-    double xid_y[n];
     for (auto i : ap.blockCoordinates)
     {
         cout << i.first << "(" << i.second.first << ", " << i.second.second << ")" << endl;
@@ -99,7 +96,6 @@ map<int, pair<double, double>> analyticalPlacer::umfsolver(matrix_UMF matrixToSo
         cout << i.first << "(" << i.second.first << ", " << i.second.second << ")" << endl;
     }
     return blockCoordinates;
-    // cout << nonfixedblockids[i] << "(" << xid_x[i] << "," << xid_y[i] << ")" << endl;
 }
 
 void analyticalPlacer::createNets(vector<vector<int>> blocks)
@@ -206,7 +202,6 @@ matrix_UMF analyticalPlacer::createMatrix()
             {
                 int connBlock = colidx;
                 bool connected = (row[connBlock] > 0) ? true : false;
-                // cout << nonfixedblockids[i] << " " << colidx << " " << edgeWeights[net][nonfixedblockids[i]][colidx] << " " << fixedXCoords[connBlock] << " " << row[colidx] << " " << edgeWeights[net][nonfixedblockids[i]][colidx] * fixedXCoords[connBlock] << endl;
                 if ((row[colidx] > 0))
                 {
 
@@ -371,195 +366,185 @@ void analyticalPlacer::adjustFixedWeights(double factor)
 void analyticalPlacer::daravspreading()
 {
     bins.clear();
-    overflowed.clear();
-    cost.clear();
-    int iter = 1;
-
+    int ctr = 0;
+    splitIntoBins();
+    int iter = 0;
     int psi;
-    blockCoordinates_orig = blockCoordinates;
     blockCoordinates_new = blockCoordinates;
+    blockCoordinates_orig = blockCoordinates;
     overflowed = findOverfilledBins();
     while (!overflowed.empty())
     {
-        psi = iter * iter;
         overflowed = findOverfilledBins();
-        if (overflowed.size() == 0)
+        cout << overflowed.size() << endl;
+        if (overflowed.size() == 2)
         {
+            for (auto i : overflowed)
+            {
+                cout << i.first.first << "," << i.first.second << endl;
+                for (auto j : bins[i.first])
+                {
+                    cout << j << ",";
+                }
+                cout << endl;
+            }
             return;
         }
-        cout << overflowed.size() << endl;
-
+        psi = iter * iter;
+        if (overflowed.size() == 0)
+        {
+            blockCoordinates = blockCoordinates_new;
+            return;
+        }
         sort(overflowed.begin(), overflowed.end(),
              [](const pair<pair<int, int>, int> &a, const pair<pair<int, int>, int> &b)
              { return a.second < b.second; });
-
         for (pair<pair<int, int>, int> bi : overflowed)
         {
-            // P(bi) = list of candidate paths for bi
+
             vector<vector<pair<int, int>>> Pbi = identifyCandidatePaths(bi.first, psi);
-            // for each pk: P(bi) do
             for (vector<pair<int, int>> pk : Pbi)
             {
                 if (supply(bi.first) > 0)
                 {
-
-                    // move cells along pk
-                    queue<pair<int, pair<double, double>>> tospread;
-                    // cout << endl;
-                    for (auto block : blockCoordinates)
-                    {
-
-                        bool bottomLeft = (block.second.first >= bi.first.first && block.second.first <= bi.first.first + 1 &&
-                                           block.second.second >= bi.first.second && block.second.second <= bi.first.second + 1);
-
-                        bool bottomRight = ((block.second.first + 1) >= bi.first.first && (block.second.first + 1) <= bi.first.first + 1 &&
-                                            block.second.second >= bi.first.second && block.second.second <= bi.first.second + 1);
-
-                        bool topLeft = (block.second.first >= bi.first.first && block.second.first <= bi.first.first + 1 &&
-                                        (block.second.second + 1) >= bi.first.second && (block.second.second + 1) <= bi.first.second + 1);
-
-                        bool topRight = ((block.second.first + 1) >= bi.first.first && (block.second.first + 1) <= bi.first.first + 1 &&
-                                         (block.second.second + 1) >= bi.first.second && (block.second.second + 1) <= bi.first.second + 1);
-
-                        if (bottomLeft || bottomRight || topLeft || topRight)
-                        {
-                            if (fixedblocks.find(block.first) != fixedblocks.end())
-                            {
-                            }
-                            else
-                            {
-                                tospread.push({block.first, {block.second.first - bi.first.first, block.second.second - bi.first.second}});
-                            }
-                        }
-                    }
-                    int i = 0;
-                    // cout << tospread.size() << " ";
-                    // cout << bi.first.first << "," << bi.first.second << endl;
-                    while (!tospread.empty())
-                    {
-                        pair<int, pair<double, double>> cell = tospread.front();
-                        // cout << bi.first.first << "," << bi.first.second << " | " << pk[i].first << "," << pk[i].second << " - " << cell.first << " original bin supply: " << bins[bi.first] << " new bin supply: " << bins[{pk[i].first, pk[i].second}] << " tospreadsize: " << tospread.size() << endl;
-
-                        blockCoordinates[cell.first] = {
-                            blockCoordinates[cell.first].first + (pk[i].first - bi.first.first),
-                            blockCoordinates[cell.first].second + (pk[i].second - bi.first.second)};
-
-                        bins[{pk[i].first, pk[i].second}] += 1;
-                        bins[{pk[i].first, pk[i].second + 1}] += 1;
-                        bins[{pk[i].first + 1, pk[i].second}] += 1;
-                        bins[{pk[i].first + 1, pk[i].second + 1}] += 1;
-
-                        bins[{bi.first.first, bi.first.second}] -= 1;
-                        bins[{bi.first.first, bi.first.second + 1}] -= 1;
-                        bins[{bi.first.first + 1, bi.first.second}] -= 1;
-                        bins[{bi.first.first + 1, bi.first.second + 1}] -= 1;
-
-                        if (i < pk.size() - 1)
-                        {
-                            i++;
-                        }
-                        else
-                        {
-                            i = 0;
-                        }
-
-                        tospread.pop();
-                    }
+                    cellMove(pk, psi);
                 }
             }
         }
         iter++;
     }
+    blockCoordinates = blockCoordinates_new;
 }
+
 vector<vector<pair<int, int>>> analyticalPlacer::identifyCandidatePaths(pair<int, int> bi, int psi)
 {
+    int demand = 0;
     vector<vector<pair<int, int>>> ret;
     ret.clear();
     map<pair<int, int>, bool> visited;
     visited.clear();
-    //    demand = 0
-    int demand = 0;
-    // mark all bins as unvisited
     for (auto bin : bins)
     {
         visited[bin.first] = false;
     }
-    // visited (bi) = true
     visited[bi] = true;
-    // insert bi into empty path P
     vector<pair<int, int>> emptyP;
     emptyP.push_back(bi);
-    cost[emptyP] = 0;
-    vector<pair<int, int>> p;
-    // add path p to FIFO q
-    queue<vector<pair<int, int>>> fifo;
-    fifo.push(emptyP);
-
-    // while(!Q.empty() || demand>=supply(bi)){
-    while (!fifo.empty() && demand < supply(bi))
+    queue<vector<pair<int, int>>> Q;
+    Q.push(emptyP);
+    while (!Q.empty() || demand < supply(bi))
     {
-        if (fifo.empty())
+        if (Q.empty())
         {
             break;
         }
-        //     pop p from Q
-        p = fifo.front();
-
-        //     tail bin = current end of path p
-        pair<int, int> tail = p[p.size() - 1];
-        cout << "==================" << endl
-             << tail.first << "," << tail.second << endl;
-        //     for neighbour bins bk of tailbin{
+        vector<pair<int, int>> P = Q.front();
+        pair<int, int> tailbin = P[P.size() - 1];
         for (pair<int, int> nDirection : directions)
         {
-            pair<int, int> bk = tail;
+            pair<int, int> bk = tailbin;
             bk.first += nDirection.first;
             bk.second += nDirection.second;
-            cout << bk.first << "," << bk.second << endl;
-            if ((0 <= bk.first && bk.first <= 29) && (0 <= bk.second && bk.second <= 29))
+            if ((0 <= bk.first && bk.first < 28) && (0 <= bk.second && bk.second <= 29))
             {
-                // if bk is visited{
                 if (visited[bk])
                 {
-                    // continue/ignore
                     continue;
                 }
-
-                // ccost = compute cost(tailbin, bk) <- cost of extending path by one bin
-                int ccost = computecost(tail, bk, psi);
-                // if(cost < inf){
+                int ccost = computecost(tailbin, bk, psi);
                 if (ccost < INT_MAX)
                 {
-                    // pcopy = a copy of p
-                    vector<pair<int, int>> pcopy = p;
-                    // cost(pcopy) = cost(p) + ccost
-                    cost[pcopy] = cost[p] + ccost;
-                    // insert bk to pcopy //new tail
+                    vector<pair<int, int>> pcopy = P;
+                    cost[pcopy] = cost[P] + ccost;
                     pcopy.push_back(bk);
-                    // visited(bk) = true
                     visited[bk] = true;
-                    // if(bk.empty()){
-                    if (bins[bk] == 0)
+                    if (bins[bk].size() == 0)
                     {
-
-                        // insert pcopy to P(bi)
                         ret.push_back(pcopy);
-                        // demand++
                         demand++;
-                        //}else{
                     }
                     else
                     {
-                        // add pcopy into Q
-                        fifo.push(pcopy);
+                        Q.push(pcopy);
                     }
                 }
             }
         }
-        fifo.pop();
+        Q.pop();
     }
-
     return ret;
+}
+void analyticalPlacer::cellMove(vector<pair<int, int>> P, int psi)
+{
+    int i = 0;
+    stack<pair<int, int>> S;
+    pair<int, int> Vsink;
+    pair<int, int> Vsrc = P[i];
+    S.push(P[i]);
+    i++;
+    while (i != P.size())
+    {
+        Vsink = P[i];
+        int cost = computecost(Vsrc, Vsink, psi);
+        if (cost == INT_MAX)
+        {
+            return;
+        }
+        Vsrc = Vsink;
+        S.push(P[i]);
+        i++;
+    }
+    Vsink = S.top();
+    S.pop();
+    while (!S.empty())
+    {
+        Vsrc = S.top();
+        S.pop();
+        vector<pair<int, double>> blockDistances;
+        for (int blockID : bins[Vsrc])
+        {
+            double quadraticdist = sqrt(pow((Vsink.first - blockCoordinates_orig[blockID].first), 2) + pow((Vsink.second - blockCoordinates_orig[blockID].second), 2));
+            blockDistances.push_back({blockID, quadraticdist});
+        }
+        sort(blockDistances.begin(), blockDistances.end(), [](const pair<int, double> &a, const pair<int, double> &b)
+             { return a.second < b.second; });
+
+        for (auto block : blockDistances)
+        {
+            if (bins[Vsink].size() == 0)
+            {
+                int xbin = static_cast<int>(blockCoordinates_new[block.first].first);
+                int ybin = static_cast<int>(blockCoordinates_new[block.first].second);
+                bins[{xbin, ybin}].erase(block.first);
+                bins[{xbin, ybin + 1}].erase(block.first);
+                bins[{xbin + 1, ybin}].erase(block.first);
+                bins[{xbin + 1, ybin + 1}].erase(block.first);
+                if (blocktypes[block.first] == 1)
+                {
+                    bins[{xbin + 2, ybin}].erase(block.first);
+                    bins[{xbin + 2, ybin + 1}].erase(block.first);
+                }
+
+                blockCoordinates_new[block.first] = {blockCoordinates_new[block.first].first - Vsrc.first + Vsink.first, blockCoordinates_new[block.first].second - Vsrc.second + Vsink.second};
+
+                xbin = static_cast<int>(blockCoordinates_new[block.first].first);
+                ybin = static_cast<int>(blockCoordinates_new[block.first].second);
+                bins[{xbin, ybin}].insert(block.first);
+                bins[{xbin, ybin + 1}].insert(block.first);
+                bins[{xbin + 1, ybin}].insert(block.first);
+                bins[{xbin + 1, ybin + 1}].insert(block.first);
+                if (blocktypes[block.first] == 1)
+                {
+                    bins[{xbin + 2, ybin}].insert(block.first);
+                    bins[{xbin + 2, ybin + 1}].insert(block.first);
+                }
+                blockCoordinates = blockCoordinates_new;
+            }
+            Vsink = Vsrc;
+            break;
+        }
+        // cout << S.size() << endl;
+    }
 }
 int analyticalPlacer::supply(pair<int, int> bi)
 {
@@ -568,44 +553,49 @@ int analyticalPlacer::supply(pair<int, int> bi)
 
 int analyticalPlacer::usage(pair<int, int> bi)
 { // number of blocks in bin i
-    return bins[bi];
+    return bins[bi].size();
 }
 int analyticalPlacer::capacity(pair<int, int> bi)
 {
     return 1;
 }
-int analyticalPlacer::computecost(pair<int, int> tailbin, pair<int, int> bk, int psi)
+double analyticalPlacer::computecost(pair<int, int> tailbin, pair<int, int> bk, int psi)
 {
-    // TODO: I think this is wrong
-    double quadraticdist = pow((bk.first - tailbin.first), 2) + pow((bk.second - tailbin.second), 2);
-
-    if (static_cast<int>(quadraticdist) > psi)
+    double ret = INT_MAX;
+    for (auto block : bins[tailbin])
     {
-        return INT_MAX;
+        double quadraticdist = sqrt(pow((bk.first - blockCoordinates_orig[block].first), 2) + pow((bk.second - blockCoordinates_orig[block].second), 2));
+        if (quadraticdist < psi)
+        {
+            ret = min(ret, quadraticdist);
+        }
     }
-    else
-    {
-        return static_cast<int>(quadraticdist);
-    }
+    return ret;
 }
 void analyticalPlacer::splitIntoBins()
 {
+    bins.clear();
     for (int i = 0; i < 30; i++)
     {
         for (int j = 0; j < 30; j++)
         {
-            bins[{i, j}] = 0;
+            bins[{i, j}] = set<int>();
         }
     }
-    for (auto blockid : nonfixedblockids)
+    for (auto blockID : nonfixedblockids)
     {
-        pair<double, double> coords = blockCoordinates[blockid];
+        pair<double, double> coords = blockCoordinates_new[blockID];
         int xbin = static_cast<int>(coords.first);
         int ybin = static_cast<int>(coords.second);
-        bins[{xbin, ybin}] += 1;
-        bins[{xbin, ybin + 1}] += 1;
-        bins[{xbin + 1, ybin}] += 1;
-        bins[{xbin + 1, ybin + 1}] += 1;
+        bins[{xbin, ybin}].insert(blockID);
+        bins[{xbin, ybin + 1}].insert(blockID);
+        bins[{xbin + 1, ybin}].insert(blockID);
+        bins[{xbin + 1, ybin + 1}].insert(blockID);
+        if (blocktypes[blockID] == 1)
+        {
+            bins[{xbin + 2, ybin}].insert(blockID);
+            bins[{xbin + 2, ybin + 1}].insert(blockID);
+        }
     }
 }
 vector<pair<pair<int, int>, int>> analyticalPlacer::findOverfilledBins()
@@ -615,24 +605,9 @@ vector<pair<pair<int, int>, int>> analyticalPlacer::findOverfilledBins()
     ret.clear();
     for (auto bin : bins)
     {
-        if (bin.second > 1)
+        if (bin.second.size() > 1)
         {
-            // cout << bin.first.first << "," << bin.first.second << " " << bin.second << "|(" << bins[{bin.first.first - 1, bin.first.second}] << "," << bins[{bin.first.first + 1, bin.first.second}] << "," << bins[{bin.first.first, bin.first.second - 1}] << "," << bins[{bin.first.first, bin.first.second + 1}] << ")";
-            ret.push_back({bin.first, bin.second});
-        }
-    }
-    if (ret.size() == 41)
-    {
-        for (auto i : ret)
-        {
-            cout << i.first.first << "," << i.first.second << endl;
-        }
-        int n = nonfixedblockids.size();
-        double xid_x[n];
-        double xid_y[n];
-        for (auto i : blockCoordinates)
-        {
-            cout << i.first << "(" << static_cast<int>(i.second.first) << ", " << static_cast<int>(i.second.second) << ")" << endl;
+            ret.push_back({bin.first, bin.second.size()});
         }
     }
     return ret;
