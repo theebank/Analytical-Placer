@@ -73,6 +73,7 @@ void draw_grid(ezgl::renderer *g);
 void draw_blocks(ezgl::renderer *g);
 void draw_connections(ezgl::renderer *g);
 void draw_HPWL(ezgl::renderer *g);
+void draw_anchors(ezgl::renderer *g);
 
 /**
  * UI CALLBACK FUNCTIONS
@@ -99,6 +100,8 @@ void act_on_key_press(ezgl::application *application, GdkEventKey *event, char *
 static ezgl::rectangle initial_world{{0, 0}, 1100, 1150};
 
 analyticalPlacer ap;
+int CellDisplacement = 0;
+bool anchors;
 
 /**
  * The start point of the program.
@@ -111,11 +114,11 @@ analyticalPlacer ap;
  * @return the exit status of the application run.
  */
 
-/*int main(int argc, char **argv)
+int main(int argc, char **argv)
 {
-    if (argc != 3)
+    if (argc != 4)
     {
-        std::cerr << "usage: " << argv[0] << " <test circuit Num> <weight factor between fixed node and movables>\n";
+        std::cerr << "usage: " << argv[0] << " <test circuit Num> <weight factor between fixed node and movables> <0 for Parts 1/2, 1 for Part 3.1, 2 for Part 3.2>\n";
         return 1;
     }
 
@@ -143,7 +146,26 @@ analyticalPlacer ap;
 
     string filenum = argv[1];
     ap.analyticalPlacementv2("./tests/cct" + filenum + ".txt", weightfactor);
-    ap.daravspreading();
+    int number;
+    try
+    {
+        number = stoi(argv[3]);
+    }
+    catch (const invalid_argument &e)
+    {
+        cerr << "Cannot convert to int" << endl;
+    }
+    if (number == 1)
+    {
+        CellDisplacement = ap.daravspreading();
+        ap.HPWL = ap.calculateHPWL();
+    }
+    else if (number == 2)
+    {
+        CellDisplacement = ap.daravspreading();
+        ap.analyticalPlacementAnchored("./tests/cct" + filenum + ".txt", weightfactor);
+        anchors = true;
+    }
 
     // Run the application until the user quits.
     // This hands over all control to the GTK runtime---after this point
@@ -157,7 +179,7 @@ analyticalPlacer ap;
     // Those callbacks are optional, so we can pass nullptr if
     // we don't need to take any action on those events
     return application.run(initial_setup, act_on_mouse_press, act_on_mouse_move, act_on_key_press);
-}*/
+}
 
 /**
  * The redrawing function for still pictures
@@ -168,6 +190,10 @@ void draw_main_canvas(ezgl::renderer *g)
     draw_connections(g);
     draw_blocks(g);
     draw_HPWL(g);
+    if (anchors)
+    {
+        draw_anchors(g);
+    }
 }
 
 /**
@@ -552,11 +578,11 @@ void draw_grid(ezgl::renderer *g)
     {
         g->set_color(ezgl::DARK_KHAKI);
         g->draw_line({0 + 1000 * i, 0}, {0 + 1000 * i, 3000});
-        g->draw_text({0 + 1000 * i, -5}, to_string(i * 10), 200, DBL_MAX);
+        g->draw_text({0 + 1000 * i, -40}, to_string(i * 10), 200, DBL_MAX);
         g->draw_line({0, 0 + 1000 * i}, {3000, 0 + 1000 * i});
         if (i > 0)
         {
-            g->draw_text({-5, 0 + 1000 * i}, to_string(i * 10), 200, DBL_MAX);
+            g->draw_text({-50, 0 + 1000 * i}, to_string(i * 10), 200, DBL_MAX);
         }
     }
 }
@@ -566,11 +592,14 @@ void draw_blocks(ezgl::renderer *g)
     {
         if (ap.blocktypes[block.first] == 0)
         {
-            g->set_color(ezgl::LIME_GREEN);
+            g->set_color(ezgl::CYAN);
             const ezgl::point2d start_point = {(block.second.first * 100) - 50, (block.second.second * 100) - 50};
             ezgl::rectangle blockToDraw = {start_point, 100, 100};
             g->fill_rectangle(blockToDraw);
             g->set_color(ezgl::BLACK);
+            g->set_line_width(2);
+            ezgl::rectangle border = {start_point, 100, 100};
+            g->set_line_width(1);
             g->draw_text({(block.second.first * 100), (block.second.second * 100)}, to_string(block.first), 200, DBL_MAX);
         }
         else
@@ -580,6 +609,9 @@ void draw_blocks(ezgl::renderer *g)
             ezgl::rectangle blockToDraw = {start_point, 200, 100};
             g->fill_rectangle(blockToDraw);
             g->set_color(ezgl::BLACK);
+            g->set_line_width(2);
+            ezgl::rectangle border = {start_point, 100, 100};
+            g->set_line_width(1);
             g->draw_text({(block.second.first * 100), (block.second.second * 100)}, to_string(block.first), 200, DBL_MAX);
         }
     }
@@ -605,6 +637,20 @@ void draw_HPWL(ezgl::renderer *g)
 {
     g->set_color(ezgl::BLACK);
     g->draw_text({1500, -100}, "HPWL = " + to_string(ap.HPWL), 2000, DBL_MAX);
+    if (CellDisplacement != 0)
+    {
+        g->draw_text({1500, -200}, "Total Cell Displacement = " + to_string(CellDisplacement), 2000, DBL_MAX);
+    }
+}
+void draw_anchors(ezgl::renderer *g)
+{
+    for (auto i : ap.blockCoordinates)
+    {
+        pair<double, double> block1 = {i.second.first, i.second.second};
+        pair<double, double> block2 = ap.blockCoordinates_new[i.first];
+        g->set_color(ezgl::BLACK);
+        g->draw_line({block1.first * 100, block1.second * 100}, {block2.first * 100, block2.second * 100});
+    }
 }
 /**
  * A callback function to the Animate button. Creates an Animation in the main wundow

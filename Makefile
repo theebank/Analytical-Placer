@@ -16,10 +16,10 @@ ifeq (,$(findstring -DNCHOLMOD, $(UMFPACK_CONFIG)))
 endif
 
 #-------------------------------------------------------------------------------
-CXX = g++ -std=c++17
+CXXp = g++ -std=c++17
 C = $(CC) $(CF) $(UMFPACK_CONFIG) $(CONFIG_PARTITION) \
     -I SuiteSparse-5.10.1/include
-Cpp = $(CXX) $(CF) $(UMFPACK_CONFIG) $(CONFIG_PARTITION) \
+Cpp = $(CXXp) $(CF) $(UMFPACK_CONFIG) $(CONFIG_PARTITION) \
     -I SuiteSparse-5.10.1/include
 
 # LINUX
@@ -51,6 +51,10 @@ analyticalPlacer: analyticalPlacer.cpp
 
 umfpack_simple: umfpack_simple.c
 	$(C) -o umfpack_simple umfpack_simple.c $(LIBS)
+	
+visualizer: visualizer.cpp
+	$(ECHO) $(CXX) $(CXX_FLAGS) $(foreach D,$(INC_DIRS),-I$D) $(GTK_INCLUDE_DIRS) $(SRCS) $(GTK_LIBS) $(LIBS) -o $(TARGET_DIR)/$(TARGET)
+
 
 
 run: umfpack_di_demo umfpack_zi_demo umfpack_dl_demo umfpack_zl_demo umfpack_simple
@@ -67,4 +71,77 @@ purge: clean
 
 clean:
 	- $(RM) -r $(CLEAN)
+	
+	
+#-------------------------------------------------------------------------------
+VERBOSE ?= 1
+ifeq ($(VERBOSE),1)
+	ECHO := 
+else
+	ECHO := @
+endif
 
+CONF ?= debug
+
+TARGET_DIR = .
+TARGET = visualizer
+
+GTK_VERSION_NUM = 3.0
+EZGL_DIR = ezgl
+
+SRCS = $(wildcard ./*.cpp $(EZGL_DIR)/*.cpp)
+HDRS = $(wildcard ./*.h $(EZGL_DIR)/*.hpp)
+
+GTK_INCLUDE_DIRS := $(shell pkg-config --cflags gtk+-$(GTK_VERSION_NUM) x11)
+
+GTK_LIBS := $(shell pkg-config --libs gtk+-$(GTK_VERSION_NUM) x11)
+
+INC_DIRS = . $(EZGL_DIR) $(EZGL_DIR)/.. SuiteSparse-5.10.1/include
+
+CXX_FLAGS = -g -Wall -std=c++17
+
+ifeq (release, $(CONF))
+	CXX_FLAGS += -O3
+else ifeq (debug, $(CONF))
+# Don't change anything
+else
+    $(error Invalid value for CONF: '$(CONF)', must be 'release' or 'debug'. Try 'make help' for usage)
+endif
+
+# create the exe
+$(TARGET_DIR)/$(TARGET): Makefile $(SRCS)
+	$(ECHO) $(CXX) $(CXX_FLAGS) $(foreach D,$(INC_DIRS),-I$D) $(GTK_INCLUDE_DIRS) $(SRCS) $(GTK_LIBS) $(LIBS) -o $(TARGET_DIR)/$(TARGET)
+
+
+# clean the EXE 
+clean:
+	$(ECHO) rm -f $(TARGET_DIR)/$(TARGET)
+
+help:
+	@echo "Makefile for ezgl example program"
+	@echo ""
+	@echo "Usage: "
+	@echo '    > make -j4'
+	@echo "        Call the default make target (all)."
+	@echo "        This builds the project executable: '$(TARGET)'."
+	@echo "        Use -j4 option to do parallel builds."
+	@echo "    > make clean"
+	@echo "        Removes any generated files including exectuables "
+	@echo "        and object files."
+	@echo "    > make help"
+	@echo "        Prints this help message."
+	@echo ""
+	@echo ""
+	@echo "Configuration Variables: "
+	@echo "    CONF={release | debug}"
+	@echo "        Controls whether the build performs compiler optimizations"
+	@echo "        to improve performance. Currently set to '$(CONF)'."
+	@echo ""
+	@echo "        With CONF=release compiler optimization is enabled."
+	@echo ""
+	@echo "        With CONF=debug compiler optimization is disabled to improve"
+	@echo "        interactive debugging."
+
+
+.PHONY: all clean help
+	
